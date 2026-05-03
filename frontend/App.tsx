@@ -38,6 +38,12 @@ const GlobalStyles = () => (
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: 0.8; transform: scale(1.05); }
     }
+    @keyframes rainbow-text {
+      0% { color: #F4A829; }
+      33% { color: #34C759; }
+      66% { color: #C0392B; }
+      100% { color: #F4A829; }
+    }
     .animate-float { animation: float 3s ease-in-out infinite; }
     .animate-shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
     .animate-pop { animation: pop 0.3s ease-out; }
@@ -45,6 +51,7 @@ const GlobalStyles = () => (
     .animate-slide-out { animation: slideOut 0.4s ease-in forwards; }
     .animate-float-up { animation: floatUpFade 1s ease-out forwards; }
     .animate-pulse-fast { animation: pulse-fast 0.5s ease-in-out infinite; }
+    .animate-rainbow { animation: rainbow-text 2s linear infinite; }
     
     /* Dhaba texture pattern */
     .dhaba-bg {
@@ -96,6 +103,7 @@ export default function App() {
   const [wrongButtonId, setWrongButtonId] = useState<string | null>(null);
   const [correctButtonId, setCorrectButtonId] = useState<string | null>(null);
   const [customerAnimClass, setCustomerAnimClass] = useState('animate-slide-in');
+  const [showAwesomeBoss, setShowAwesomeBoss] = useState(false);
 
   const timerRef = useRef<number | null>(null);
   const textIdCounter = useRef(0);
@@ -124,9 +132,17 @@ export default function App() {
     };
   }, [state.screen, state.isTransitioning]);
 
+  // Cleanup BGM on unmount
+  useEffect(() => {
+    return () => {
+      audio.stopBGM();
+    };
+  }, []);
+
   // --- Actions ---
   const startGame = useCallback(() => {
     audio.init();
+    audio.startBGM();
     const config = getRoundConfig(1);
     setState(prev => ({
       ...prev,
@@ -143,9 +159,11 @@ export default function App() {
     }));
     setGridIngredients(INGREDIENTS); // Initial grid
     setCustomerAnimClass('animate-slide-in');
+    setShowAwesomeBoss(false);
   }, []);
 
   const handleGameOver = useCallback(() => {
+    audio.stopBGM();
     audio.playLose();
     setCustomerAnimClass('animate-shake');
     setTimeout(() => {
@@ -168,14 +186,14 @@ export default function App() {
   const spawnConfetti = () => {
     const particles: ConfettiParticle[] = [];
     const emojis = ['🍚', '🌶️', '🥩', '✨', '🔥'];
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 40; i++) {
       particles.push({
         id: i,
         emoji: emojis[Math.floor(Math.random() * emojis.length)],
         x: window.innerWidth / 2,
         y: window.innerHeight / 2,
-        vx: (Math.random() - 0.5) * 15,
-        vy: (Math.random() - 0.5) * 15 - 5,
+        vx: (Math.random() - 0.5) * 20,
+        vy: (Math.random() - 0.5) * 20 - 5,
         rotation: Math.random() * 360,
         vr: (Math.random() - 0.5) * 20,
       });
@@ -203,11 +221,22 @@ export default function App() {
 
   const handleNextRound = useCallback(() => {
     audio.playWin();
-    audio.playHappy();
+    audio.playDegTakTak();
     spawnConfetti();
     setCustomerAnimClass('animate-slide-out');
     
     setState(prev => ({ ...prev, isTransitioning: true }));
+
+    // Check for Awesome Biryani Boss milestone (every 3 rounds)
+    if (state.round % 3 === 0) {
+      setTimeout(() => {
+        audio.playAwesomeBiryaniBoss();
+        setShowAwesomeBoss(true);
+        setTimeout(() => setShowAwesomeBoss(false), 2500);
+      }, 500);
+    } else {
+      audio.playHappy();
+    }
 
     setTimeout(() => {
       setState(prev => {
@@ -237,7 +266,7 @@ export default function App() {
       if (state.round + 1 >= 4) {
         setGridIngredients(shuffleArray(INGREDIENTS));
       }
-    }, 1000);
+    }, 1500); // Slightly longer transition to allow sounds to play
   }, [state.round]);
 
   const handleIngredientTap = useCallback((ingredient: Ingredient, event: React.MouseEvent | React.TouchEvent) => {
@@ -456,9 +485,20 @@ export default function App() {
       </div>
 
       {/* Round Transition Overlay */}
-      {state.isTransitioning && (
+      {state.isTransitioning && !showAwesomeBoss && (
         <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50 animate-pop">
           <h2 className="text-5xl font-black text-[#F4A829]">Round {state.round + 1}</h2>
+        </div>
+      )}
+
+      {/* Awesome Biryani Boss Overlay */}
+      {showAwesomeBoss && (
+        <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-50 animate-pop">
+          <div className="text-8xl mb-4 animate-float">🌟</div>
+          <h2 className="text-4xl font-black text-center px-4 animate-rainbow drop-shadow-[0_0_15px_rgba(244,168,41,0.8)]">
+            AWESOME<br/>BIRYANI BOSS!
+          </h2>
+          <div className="text-8xl mt-4 animate-float" style={{ animationDelay: '0.5s' }}>🍲</div>
         </div>
       )}
 
